@@ -71,9 +71,9 @@
     "last 2 versions"
   ],
   "bugs": {
-    "url": "https://github.com/hellowuxin/mindmap/issues"
+    "url": "https://github.com/colin3dmax/mindmap/issues"
   },
-  "homepage": "https://github.com/hellowuxin/mindmap#readme",
+  "homepage": "https://github.com/colin3dmax/mindmap#readme",
   "keywords": [
     "mindmap",
     "vue",
@@ -82,6 +82,6 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hellowuxin/mindmap.git"
+    "url": "git+https://github.com/colin3dmax/mindmap.git"
   }
 }
