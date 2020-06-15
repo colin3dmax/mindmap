@@ -73,7 +73,7 @@ export default {
     showUndo: { type: Boolean, default: true },
     strokeWidth: { type: Number, default: 4 },
     linearLineStartFactor: { type: Number, default: 1 },
-    linearLineEndFactor: { type: Number, default: 0.3 },
+    linearLineEndFactor: { type: Number, default: 0.4 },
   },
   model: { // 双向绑定
     prop: 'value',

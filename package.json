@@ -1,8 +1,7 @@
 {
-  "name": "@hellowuxin/mindmap",
+  "name": "@cross2d/mindmap",
   "version": "1.6.2",
   "description": "Mindmap Vue Component",
-  "author": "伍鑫",
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
