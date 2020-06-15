@@ -60,6 +60,7 @@ export default {
     height: Number,
     xSpacing: { type: Number, default: 80 },
     ySpacing: { type: Number, default: 20 },
+    showTaperedLine: { type: Boolean, default: true },
     draggable: { type: Boolean, default: true },
     gps: { type: Boolean, default: true },
     fitView: { type: Boolean, default: true },
@@ -71,6 +72,8 @@ export default {
     zoomable: { type: Boolean, default: true },
     showUndo: { type: Boolean, default: true },
     strokeWidth: { type: Number, default: 4 },
+    linearLineStartFactor: { type: Number, default: 1 },
+    linearLineEndFactor: { type: Number, default: 0.3 },
   },
   model: { // 双向绑定
     prop: 'value',
@@ -105,6 +108,48 @@ export default {
     mindmapSvgZoom: Function,
     easePolyInOut: d3.transition().duration(1000).ease(d3.easePolyInOut),
     link: d3.linkHorizontal().x((d) => d[0]).y((d) => d[1]),
+    linkLinear: ({source,target,startOffset=0,endOffset=0})=>{
+      let distance = Math.sqrt( (target[0]-source[0])**2 + (target[1]-source[1])**2 )
+      const endOffsetX = (target[1] - source[1])/distance*(endOffset/2)
+      const endOffsetY = (target[0] - source[0])/distance*(endOffset/2)
+
+      let target1X = target[0] + endOffsetX;
+      let target1Y = target[1] - endOffsetY;
+      let target2X = target[0] - endOffsetX;
+      let target2Y = target[1] + endOffsetY;
+      let target1 = [target1X,target1Y]
+      let target2 = [target2X,target2Y]
+
+      const startOffsetX = (target[1] - source[1])/distance*(startOffset/2)
+      const startOffsetY = (target[0] - source[0])/distance*(startOffset/2)
+      let source1X = source[0] + startOffsetX;
+      let source1Y = source[1] - startOffsetY;
+      let source2X = source[0] - startOffsetX;
+      let source2Y = source[1] + startOffsetY;
+      let source1 = [source1X,source1Y]
+      let source2 = [source2X,source2Y]
+      
+      
+      let path = d3.path()
+      path.moveTo(source1[0],source1[1])
+      //第一条要更新的曲线
+      let x0 = source1[0]
+      let y0 = source1[1]
+      let x1 = target1[0]
+      let y1 = target1[1]
+      path.bezierCurveTo((x0 + x1) / 2, y0, (x0 + x1) / 2, y1, x1, y1);
+      path.lineTo(target1[0],target1[1])
+      path.lineTo(target2[0],target2[1])
+      //第二条要更新的曲线
+      x0 = target2[0]
+      y0 = target2[1]
+      x1 = source2[0]
+      y1 = source2[1]
+      path.bezierCurveTo(x0 = (x0 + x1) / 2, y0, x0, y1, x1, y1);
+      
+      path.closePath()
+      return path;
+    },
     zoom: d3.zoom(),
     history: new History(),
     selectedElement: undefined,
@@ -122,6 +167,10 @@ export default {
     keyboard: function(val) { this.makeKeyboard(val) },
     showNodeAdd: function(val) { this.makeNodeAdd(val) },
     draggable: function(val) { this.makeDrag(val) },
+    showTaperedLine: function(val) { 
+      this.makeTaperedLine(val) 
+      this.updateMindmap()
+    },
     contextMenu: function(val) { this.makeContextMenu(val) },
     xSpacing: function() { 
       this.depthTraverse2(this.mmdata.data, this.getTextSize)
@@ -130,6 +179,7 @@ export default {
     ySpacing: function() { this.updateMindmap() },
     nodeClick: function(val) { this.makeNodeClick(val) },
     zoomable: function(val) { this.makeZoom(val) },
+    strokeWidth: function() { this.updateMindmap() },
   },
   methods: {
     init() {
@@ -147,6 +197,7 @@ export default {
     },
     initNodeEvent() {
       // 绑定节点事件
+      this.makeTaperedLine(this.showTaperedLine)
       this.makeDrag(this.draggable)
       this.makeNodeAdd(this.showNodeAdd)
       this.makeContextMenu(this.contextMenu)
@@ -181,6 +232,9 @@ export default {
       } else {
         this.mindmap_g.selectAll('foreignObject').call(d3.drag().on('drag', null).on('end', null))
       }
+    },
+    makeTaperedLine(val){
+      console.log("makeTaperedLine:",val)
     },
     makeNodeClick(val) {
       this.mindmap_g.selectAll('foreignObject').on('click', val ? this.fObjectClick : null)
@@ -438,14 +492,36 @@ export default {
       const tran = d3.transition().duration(dura).ease(d3.easePoly)
       d3.select(draggedNode).transition(tran).attr('transform', `translate(${targetY},${targetX})`)
       // 更新draggedNode与父节点的path
+
+    
+
       d3.select(draggedNode).each((d) => {
-        d3.select(`path#path_${d.data.id}`).transition(tran).attr('d', `${link({
-          source: [
-            -targetY + (d.parent ? d.parent.data.size[1] : 0) - xSpacing, 
-            -targetX + (d.parent ? d.parent.data.size[0]/2 : 0)
-          ],
-          target: [0, d.data.size[0]/2],
-        })}L${d.data.size[1] - xSpacing},${d.data.size[0]/2}`)
+        let sourceY = -targetY + (d.parent ? d.parent.data.size[1] : 0) - xSpacing
+        let sourceX =  -targetX + (d.parent ? d.parent.data.size[0]/2 : 0)
+        let linkPath1 = link({
+            source: [
+              sourceY, 
+              sourceX,
+            ],
+            target: [0, d.data.size[0]/2],
+          })
+        linkPath1 = `M${0},${d.data.size[0]/2}`
+        d3.select(`path#path_${d.data.id}`).transition(tran).attr('d', `${linkPath1}L${d.data.size[1] - xSpacing},${d.data.size[0]/2}`)
+
+        //修正渐变移动时动画
+        const parentPosY = (d.parent ? d.parent.data.size[1] : 0) - xSpacing  // 横坐标
+        const parentPosX = (d.parent ? d.parent.data.size[0]/2 : 0) // 纵坐标
+        const linkPath = this.linkLinear({
+            source: [
+              -targetY + parentPosY, // 横坐标
+              -targetX + parentPosX,// 纵坐标
+            ],
+            target: [0, d.data.size[0]/2],
+            startOffset: this.strokeWidth*this.linearLineStartFactor,
+            endOffset: this.strokeWidth*this.linearLineEndFactor,
+        });
+        d3.select(`path#linear_path_${d.data.id}`).transition(tran).attr('d', `${linkPath}`)
+        
       })
     },
     draggedNodeChildrenRenew(d, px, py) {
@@ -581,19 +657,52 @@ export default {
     gTransform(d) { return `translate(${d.dy},${d.dx})` },
     foreignY(d) { return -d.data.size[0]/2 - 5 },
     gBtnTransform(d) { return `translate(${d.data.size[1] + 8 - this.xSpacing},${d.data.size[0]/2 - 12})` },
-    pathId(d) { return `path_${d.data.id}` },
+    pathId(d) { 
+       const id =  `path_${d.data.id}`
+       console.log("pathId-->",id)
+      return id
+     },
+    linearPathId(d) {
+      const id =  `linear_path_${d.data.id}` 
+      console.log("linearPathId-->",id)
+       return id
+    },
+    linearPathClass(d) { return `depth_${d.depth}` },
     pathClass(d) { return `depth_${d.depth}` },
     pathColor(d) { return d.data.color },
     path(d) {
-      return `${
-        this.link({
+      const parentPosX = (d.parent ? d.parent.y + d.parent.data.size[1] : 0) - d.y - this.xSpacing  // 横坐标
+      const parentPosY = (d.parent ? d.parent.x + d.parent.data.size[0]/2: 0) - d.x // 纵坐标
+      let linkPath = this.showTaperedLine? `M${0},${d.data.size[0]/2}` : this.link({
           source: [
-            (d.parent ? d.parent.y + d.parent.data.size[1] : 0) - d.y - this.xSpacing, // 横坐标
-            (d.parent ? d.parent.x + d.parent.data.size[0]/2: 0) - d.x,// 纵坐标
+            parentPosX, // 横坐标
+            parentPosY,// 纵坐标
           ],
           target: [0, d.data.size[0]/2],
-          })
-        }L${d.data.size[1] - this.xSpacing},${d.data.size[0]/2}`
+          });
+      // console.log(linkPath,d)
+      let appendLine = `L${0+d.data.size[1] - this.xSpacing},${d.data.size[0]/2}`
+      // appendLine = ``
+      //线条渐细
+      const linearLine = `` // `M0,0,L100,100`
+      //文字方框
+      let appendTextRect = `L${0+d.data.size[1] - this.xSpacing},${d.data.size[0]/2}L${0+d.data.size[1] - this.xSpacing},${-d.data.size[0]}L${0},${-d.data.size[0]}L${0},${d.data.size[0]/2}`
+      appendTextRect = ``
+      return `${linearLine}${linkPath}${appendLine}${appendTextRect}`
+    },
+    linearPath(d){
+      const parentPosX = (d.parent ? d.parent.y + d.parent.data.size[1] : 0) - d.y - this.xSpacing  // 横坐标
+      const parentPosY = (d.parent ? d.parent.x + d.parent.data.size[0]/2: 0) - d.x // 纵坐标
+      const linkPath = this.linkLinear({
+        source: [
+          parentPosX, // 横坐标
+          parentPosY,// 纵坐标
+        ],
+        target: [0, d.data.size[0]/2],
+        startOffset: this.strokeWidth*this.linearLineStartFactor,
+        endOffset: this.strokeWidth*this.linearLineEndFactor,
+      });
+      return `${linkPath}`
     },
     nest(d, i, n) {
       const dd = d.children
@@ -610,7 +719,7 @@ export default {
     appendNode(enter) {
       const { 
         gClass, gTransform, updateNodeName, divKeyDown, foreignY, gBtnTransform, 
-        pathId, pathClass, pathColor, path, nest, fdivMouseDown
+        pathId, linearPathId, pathClass, linearPathClass, pathColor, path, linearPath, nest, fdivMouseDown
       } = this
 
       const gNode = enter.append('g')
@@ -637,6 +746,8 @@ export default {
       gBtn.append('rect').attr('width', 24).attr('height', 24).attr('rx', 3).attr('ry', 3)
       gBtn.append('path').attr('d', 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z')
       
+    
+      
       const enterData = enter.data()
       if (enterData.length) {
         if (enterData[0].data.id !== '0') {
@@ -646,6 +757,18 @@ export default {
             .lower()
             .attr('stroke', pathColor)
             .attr('d', path)
+            .transition(this.easePolyInOut)
+
+          //线条渐细
+          const linearLine = gNode.append("path").style('stroke-width',0)
+          linearLine.attr('id', linearPathId)
+          linearLine.attr('class', linearPathClass)
+          linearLine.attr('stroke', pathColor)
+          linearLine.style('fill', pathColor)
+          linearLine.transition(this.easePolyInOut)
+          // linearLine.style('fill', "blue")
+          linearLine.attr('stroke', "red")
+          linearLine.attr('d', this.showTaperedLine?linearPath:"")
         } else if (enterData[0].data.id === '0') { // 根节点
           foreign.attr('y', (d) => foreignY(d)+d.size[0]/2)
         }
@@ -659,7 +782,10 @@ export default {
     },
     updateNode(update) {
       const { 
-        gClass, gTransform, easePolyInOut, foreignY, gBtnTransform, pathId, pathClass, pathColor, path, nest
+        gClass, gTransform, easePolyInOut, foreignY, gBtnTransform, pathId, pathClass, pathColor, nest,
+        linearPathId, 
+        linearPath,
+        path, 
       } = this
 
       update.interrupt().selectAll('*').interrupt()
@@ -681,9 +807,24 @@ export default {
           .attr('id', pathId(d))
           .attr('class', pathClass(d))
           .attr('stroke', pathColor(d))
+          // .attr('stroke', "black")
           .transition(easePolyInOut)
           .attr('d', path(d))
-        
+
+
+        //对渐变直线进行处理
+        node.select('path:nth-child(2)')
+          .filter((d, i, n) => n[i].parentNode === node.node())
+          .style('stroke-width',0)
+          .attr('id', linearPathId(d))
+          .attr('stroke', pathColor(d))
+          .style('fill', pathColor(d))
+          // .style('fill', "blue")
+          .attr('stroke', "red")
+          .transition(easePolyInOut)    //必须加此动画，保持动画一致性,动画必须放置到属性设置后面
+          .attr('d', this.showTaperedLine?linearPath(d):"")
+         
+
         node.each(nest)
         
         node.selectAll('g.gButton')

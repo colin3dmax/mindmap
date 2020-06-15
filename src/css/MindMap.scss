@@ -28,6 +28,7 @@ div#mindmap {
       cursor: default;
       border-radius: 3px;
       border-width: 2px;
+      
       border-color: transparent;
       border-style: solid;
 
@@ -41,7 +42,8 @@ div#mindmap {
         width: max-content;
         white-space:pre-wrap;
         color: rgb(109, 109, 109);
-
+        // padding: 10px;
+        // box-sizing: border-box;
         &:focus {
           border-color: rgb(154, 154, 154);
           outline: none;

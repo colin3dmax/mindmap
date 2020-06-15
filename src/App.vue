@@ -32,6 +32,7 @@
                     :xSpacing="xSpacing"
                     :ySpacing="ySpacing"
                     :strokeWidth="strokeWidth"
+                    :showTaperedLine="options.showTaperedLine.value"
                   ></mindmap>
                   <v-divider vertical></v-divider>
                 </div>
@@ -118,6 +119,7 @@ export default {
       nodeClick: { value: true },
       zoomable: { value: true },
       showUndo: { value: true },
+      showTaperedLine: { value: true },
     },
     xSpacing: 80,
     ySpacing: 20,
